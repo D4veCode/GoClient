@@ -5,6 +5,9 @@ import (
 	"os"
 	"net"
 	"strings"
+	b64 "encoding/base64"
+	"crypto/md5"
+	"encoding/hex"
 )
 func main(){	
 
@@ -47,9 +50,9 @@ func main(){
 	}
 
 
-	//TODO Fix Listener UDP
-	/*
-	listenerUDP, err := net.Listen("udp", "192.168.24.42:15006")
+
+	listenerUDP, err := net.ListenPacket("udp", "192.168.24.42:15006")
+
 
 	checkError(err)
 
@@ -61,28 +64,57 @@ func main(){
 
 	lenIsOk, err := conTCP.Read(isOk)
 
+	
+
 	if lenIsOk > 0{
 		fmt.Fprintf(os.Stdout, "Mensaje recibido: %s",string(isOk))
-		conUDP, err := listenerUDP.Accept()
-		checkError(err)
-
-		hiddenMsg := make([]byte, 4096)
-		lenHiddenMsg, err := conUDP.Read(hiddenMsg)
-		checkError(err)
-
-		if lenHiddenMsg > 0 {
-			fmt.Fprintf(os.Stdout, "El mensaje es: %s", string(hiddenMsg))
+		hiddenMsg := make([]byte, 1024)
+		defer listenerUDP.Close()
+		for {
+			bytesSent, _ , err := listenerUDP.ReadFrom(hiddenMsg)
+			checkError(err)
+			if bytesSent > 0 {
+				decodedMsg, _ := b64.StdEncoding.DecodeString(string(hiddenMsg))
+				fmt.Fprintf(os.Stdout, "El mensaje es: %s \n", string(decodedMsg))
+				break
+			}
 		}
 		
+		//TODO fix md5 
+		hash := md5.New()
+
+		hash.Write(hiddenMsg)
+		hashedchk := hex.EncodeToString(hash.Sum(nil))
+		
+		checksum := "chkmsg "+ hashedchk
+
+		_, err = conTCP.Write([]byte(checksum))
+		checkError(err)
+		checksumCheck := make([]byte, 1024)
+
+		lenChecksum, _ := conTCP.Read(checksumCheck)
+		checkError(err)
+
+		if lenChecksum > 0 {
+			fmt.Fprintf(os.Stdout, "Checksum : %s \n", string(checksumCheck))
+		}
+
+		_, err = conTCP.Write([]byte("bye"))
+		checkError(err)
+
+		bye := make([]byte, 16)
+
+		lenBye, err := conTCP.Read(bye)
+		checkError(err)
+
+		if lenBye > 0 {
+			fmt.Fprintf(os.Stdout, "%s \n", string(bye))
+		}
+
+		conTCP.Close()
+
+		fmt.Fprintln(os.Stdout, "Gracias por usar el cliente, hasta luego")
 	}
-	*/
-
-	
-
-
-
-
-	
 
 }
 
